@@ -1,0 +1,114 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+df = pd.read_csv("ai_job_dataset.csv")
+df.head()
+df.info()
+df.drop(['job_id', 'company_name', 'posting_date', 'application_deadline'], axis=1, inplace=True)
+# Label Encoding for categorical features
+le = LabelEncoder()
+for col in ['job_title', 'experience_level', 'employment_type', 'company_location',
+            'company_size', 'employee_residence', 'education_required', 'industry', 'salary_currency']:
+    df[col] = le.fit_transform(df[col])
+X = df.drop(['salary_usd'], axis=1)
+y = df['salary_usd']
+plt.figure(figsize=(12, 8))
+sns.heatmap(df.select_dtypes(include=['number']).corr(), annot=True, cmap='coolwarm')
+plt.title("Correlation Heatmap")
+plt.show()
+
+sns.histplot(df['salary_usd'], bins=50, kde=True)
+plt.title("Distribution of Salaries")
+plt.xlabel("Salary (USD)")
+plt.show()
+from sklearn.preprocessing import LabelEncoder
+
+# Make a copy of X to encode
+X_encoded = X.copy()
+
+# Encode all non-numeric columns
+for col in X_encoded.select_dtypes(include=['object']).columns:
+    le = LabelEncoder()
+    X_encoded[col] = le.fit_transform(X_encoded[col])
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+X_train, X_test, y_train, y_test = train_test_split(X_encoded, y, test_size=0.2, random_state=42)
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+lr_model = LinearRegression()
+lr_model.fit(X_train, y_train)
+y_pred_lr = lr_model.predict(X_test)
+
+print("Linear Regression R2 Score:", r2_score(y_test, y_pred_lr))
+rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+rf_model.fit(X_train, y_train)
+y_pred_rf = rf_model.predict(X_test)
+
+print("Random Forest R2 Score:", r2_score(y_test, y_pred_rf))
+def evaluate_model(y_test, y_pred, model_name):
+    print(f"---{model_name}---")
+    print("MAE:", mean_absolute_error(y_test, y_pred))
+    print("MSE:", mean_squared_error(y_test, y_pred))
+    print("RMSE:", np.sqrt(mean_squared_error(y_test, y_pred)))
+    print("R² Score:", r2_score(y_test, y_pred))
+    print()
+
+evaluate_model(y_test, y_pred_lr, "Linear Regression")
+evaluate_model(y_test, y_pred_rf, "Random Forest")
+import joblib
+joblib.dump(rf_model, 'employee_salary_predictor.pkl')
+from sklearn.ensemble import RandomForestRegressor
+import joblib
+
+# Train the model
+rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+rf_model.fit(X_train, y_train)
+
+# Save the model
+joblib.dump(rf_model, 'employee_salary_predictor.pkl')
+import streamlit as st
+import pandas as pd
+import numpy as np
+import joblib
+
+# Load model
+model = joblib.load('employee_salary_predictor.pkl')
+
+# Title
+st.title("💼 Employee Salary Predictor")
+st.markdown("Enter job details below to predict the expected salary (USD).")
+
+# Input fields
+job_title = st.text_input("Job Title (numeric or encoded value)")
+experience_level = st.selectbox("Experience Level", [0, 1, 2, 3])  # You can map labels later
+employment_type = st.selectbox("Employment Type", [0, 1, 2, 3])
+company_location = st.text_input("Company Location (encoded)")
+employee_residence = st.text_input("Employee Residence (encoded)")
+company_size = st.selectbox("Company Size", [0, 1, 2])
+education_required = st.selectbox("Education Level", [0, 1, 2, 3])
+remote_ratio = st.slider("Remote Ratio (%)", 0, 100, 50)
+years_experience = st.number_input("Years of Experience", 0, 50)
+benefits_score = st.number_input("Benefits Score", 0.0, 10.0, step=0.1)
+job_description_length = st.number_input("Job Description Length", 100, 5000)
+
+# Predict button
+if st.button("Predict Salary"):
+    # Combine into input array
+    input_data = np.array([[int(job_title), experience_level, employment_type,
+                            int(company_location), int(employee_residence), company_size,
+                            education_required, remote_ratio, years_experience,
+                            job_description_length, benefits_score]])
+
+    # Predict salary
+    salary_pred = model.predict(input_data)
+    st.success(f"Predicted Salary: ${int(salary_pred[0]):,} USD")
